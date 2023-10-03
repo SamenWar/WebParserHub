@@ -70,10 +70,14 @@ class PhotoDownloader
                 'json' => [
                     'message' => $message,
                 ],
+
             ]);
+            Log::channel('doclog')->info($message);
         } catch (\Exception $e) {
             // Логирование ошибок при отправке лога на сервер
             Log::error("Failed to log to API: {$e->getMessage()}");
+            Log::channel('doclog')->error("Failed to log to API: {$e->getMessage()}");
+
         }
     }
 

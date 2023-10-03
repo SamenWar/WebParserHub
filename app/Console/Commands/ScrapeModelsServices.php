@@ -69,6 +69,8 @@ class ScrapeModelsServices extends Command
         }
 
         $data = [];
+        $i = 1;
+
         foreach ($letterLinks as $letterLink) {
             $response = $client->get($letterLink);
             $htmlContent = (string) $response->getBody();
@@ -94,25 +96,52 @@ class ScrapeModelsServices extends Command
                         $photos[] = pq($photo)->attr('src');
                     }
 
-                    while ($nextLink = $profileHtml['.nv-blk a:last']) {
-                        if (strpos(pq($nextLink)->text(), 'Next') !== false) {
-                            $response = $client->get(pq($nextLink)->attr('href'));
-                            $nextHtmlContent = (string) $response->getBody();
-                            $nextHtml = phpQuery::newDocumentHTML($nextHtmlContent);
 
-                            foreach ($nextHtml['.shrt-blk img'] as $photo) {
-                                $photos[] = pq($photo)->attr('src');
+
+                    $pageCounter = 1;  // Инициализация счетчика страниц
+
+                    while ($nextLink = $profileHtml['.nv-blk a:last']) {
+                        $href = pq($nextLink)->attr('href');  // Получаем значение атрибута href
+
+                        // Проверяем, содержит ли ссылка действительный URL и текст "Next"
+                        if ($href && filter_var($href, FILTER_VALIDATE_URL) && strpos(pq($nextLink)->text(), 'Next') !== false) {
+                            try {
+                                $response = $client->get($href);
+                                $nextHtmlContent = (string) $response->getBody();
+                                $nextHtml = phpQuery::newDocumentHTML($nextHtmlContent);
+
+                                echo "Processing page: $pageCounter\n";  // Вывод номера текущей страницы
+
+                                $a = 1;
+                                foreach ($nextHtml['.shrt-blk img'] as $photo) {
+                                    $photos[] = pq($photo)->attr('src');
+                                    echo "$a\n";
+                                    $a++;
+                                }
+
+                                $pageCounter++;  // Увеличиваем счетчик страниц после обработки текущей страницы
+
+                                // Обновляем $profileHtml для следующей итерации
+                                $profileHtml = $nextHtml;
+                            } catch (\Exception $e) {
+                                // Логирование ошибок при отправке запроса или обработке ответа
+                                echo "Error processing page $pageCounter: {$e->getMessage()}\n";
+                                break;  // Выход из цикла при возникновении ошибки
                             }
                         } else {
-                            break;
+                            break;  // Выход из цикла, если условия не выполняются
                         }
                     }
+
 
                     $data[$modelName] = [
                         'profileUrl' => $profileUrl,
                         'social' => $socialLinks,
                         'photos' => $photos
                     ];
+
+                    echo "one model $modelName ready $i\n";
+                    $i++;
                 }
             }
         }
