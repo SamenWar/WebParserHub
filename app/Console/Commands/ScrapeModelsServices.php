@@ -35,7 +35,29 @@ class ScrapeModelsServices extends Command
 
     private function getModelsAndServices($url)
     {
-        $client = new Client();
+        $proxyConfig = [
+            'host' => config('fapopedia_net.proxy.host'),
+            'port' => config('fapopedia_net.proxy.port'),
+            'user' => config('fapopedia_net.proxy.user'),  // Опционально
+            'pass' => config('fapopedia_net.proxy.password'),  // Опционально
+        ];
+
+        // Проверка наличия необходимых параметров прокси
+        if (!isset($proxyConfig['host'], $proxyConfig['port'])) {
+            throw new \Exception('Incomplete proxy configuration.');
+        }
+
+        $proxyUrl = isset($proxyConfig['user'], $proxyConfig['pass']) && $proxyConfig['user'] && $proxyConfig['pass']
+            ? sprintf('http://%s:%s@%s:%d', $proxyConfig['user'], $proxyConfig['pass'], $proxyConfig['host'], $proxyConfig['port'])
+            : sprintf('http://%s:%d', $proxyConfig['host'], $proxyConfig['port']);
+
+        // Создание экземпляра клиента Guzzle с конфигурацией прокси
+        $client = new Client([
+            'proxy' => [
+                'http'  => $proxyUrl,
+                'https' => $proxyUrl,
+            ],
+        ]);
         $response = $client->get($url);
         $htmlContent = (string) $response->getBody();
 

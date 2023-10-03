@@ -17,21 +17,23 @@ class PhotoDownloader
     public function __construct()
     {
         // Получение конфигурации прокси из файла конфигурации
-        $proxyConfig = config('fapopedia_net.proxy');
+        $proxyConfig = [
+            'host' => config('fapopedia_net.proxy.host'),
+            'port' => config('fapopedia_net.proxy.port'),
+            'user' => config('fapopedia_net.proxy.user'),  // Опционально
+            'pass' => config('fapopedia_net.proxy.password'),  // Опционально
+        ];
 
         // Проверка наличия необходимых параметров прокси
-        if (!isset($proxyConfig['host'], $proxyConfig['port'], $proxyConfig['user'], $proxyConfig['pass'])) {
+        if (!isset($proxyConfig['host'], $proxyConfig['port'])) {
             throw new \Exception('Incomplete proxy configuration.');
         }
 
-        // Формирование строки прокси для Guzzle
-        $proxyUrl = sprintf(
-            'http://%s:%s@%s:%d',
-            $proxyConfig['user'],
-            $proxyConfig['pass'],
-            $proxyConfig['host'],
-            $proxyConfig['port']
-        );
+        $proxyUrl = isset($proxyConfig['user'], $proxyConfig['pass']) && $proxyConfig['user'] && $proxyConfig['pass']
+            ? sprintf('http://%s:%s@%s:%d', $proxyConfig['user'], $proxyConfig['pass'], $proxyConfig['host'], $proxyConfig['port'])
+            : sprintf('http://%s:%d', $proxyConfig['host'], $proxyConfig['port']);
+
+
         $this->apiUrl = config('fapopedia_net.api.url');
         $this->apiToken = config('fapopedia_net.api.token');
 
