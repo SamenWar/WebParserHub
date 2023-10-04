@@ -17,14 +17,16 @@ class ScrapeOneModel extends Command
 
     public function __construct()
     {
+
         parent::__construct();
     }
 
     public function handle()
     {
         $url = 'https://fapopedia.net/list/';
+        $this->logParsingState('started');  // Логирование начала парсинга
         $data = $this->getModelsAndServices($url);
-
+        $this->logParsingState('completed');  // Логирование завершения парсинга
         print_r($data);
     }
 
@@ -111,11 +113,11 @@ class ScrapeOneModel extends Command
         try {
             $response = $client->post($uri, [
                 'headers' => [
-                    'Parser-Api-Token' => $this->apiToken,  // Обновленный заголовок
+                    'Parser-Api-Token' => $this->apiToken,
                 ],
                 'json' => [
-                    'errors' => $state == 'completed' ? 'No errors' : '',  // Пример поля ошибок
-                    'site_name' => 'YourSiteName',  // Пример имени сайта
+                    'errors' => $state == 'completed' ? 'No errors' : '',
+                    'site_name' => 'https://fapopedia.net',
                     'date_start' => $dateStart,
                     'date_end' => $dateEnd,
                 ],

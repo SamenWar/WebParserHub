@@ -2,9 +2,8 @@
 
 namespace App\Console\Commands;
 
-use Exception;
+use App\Services\S3FileUploaderService;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Console\Question\ChoiceQuestion;
 
@@ -13,9 +12,12 @@ class ListAndSelectDirectory extends Command
     protected $signature = 'list:select-directory';
     protected $description = 'List all directories and allow user to select one to view its files';
 
-    public function __construct()
+    protected $s3Uploader;
+
+    public function __construct(S3FileUploaderService $s3Uploader)
     {
         parent::__construct();
+        $this->s3Uploader = $s3Uploader;
     }
 
     public function handle()
@@ -67,7 +69,14 @@ class ListAndSelectDirectory extends Command
 //        ]);
 
         if ($this->confirm('Do you wish to start the upload? [yes|no]')) {
-            $this->uploadFileToS3("models/$directoryName/$fileName");
+            $uploadResult = $this->s3Uploader->uploadFileToS3("models/$directoryName/$fileName");
+
+            if ($uploadResult['success']) {
+                $this->info($uploadResult['message']);
+                $this->info("File URL: " . $uploadResult['fileUrl']);
+            } else {
+                $this->error($uploadResult['message']);
+            }
         } else {
             $this->info('Upload cancelled.');
         }

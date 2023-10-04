@@ -28,7 +28,7 @@ class ScrapeModelsServices extends Command
         $url = 'https://fapopedia.net/list/';
         $this->logParsingState('started');  // Логирование начала парсинга
         $data = $this->getModelsAndServices($url);
-         $this->logParsingState('completed');  // Логирование завершения парсинга
+        $this->logParsingState('completed');  // Логирование завершения парсинга
         print_r($data);
     }
 
