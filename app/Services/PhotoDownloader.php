@@ -48,11 +48,22 @@ class PhotoDownloader
 
     public function downloadAllPhotos(array $data)
     {
+        $totalModels = count($data);  // Получаем общее количество моделей
+        $processedModels = 0;  // Инициализируем счетчик обработанных моделей
+
         foreach ($data as $modelName => $profile) {
             $photos = $profile['photos'] ?? [];
             $this->downloadPhotos($modelName, $photos);
+
+            // Увеличиваем счетчик обработанных моделей
+            $processedModels++;
+
+            // Вычисляем и выводим прогресс
+            $progress = ($processedModels / $totalModels) * 100;
+            echo "Progress: " . round($progress) . "%\n";
         }
     }
+
 
     protected function downloadPhotos(string $modelName, array $photos)
     {

@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use Exception;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -57,37 +58,47 @@ class ListAndSelectDirectory extends Command
 
         $this->info("You have selected: $fileName");
         $this->info("Path to the file: models/$directoryName/$fileName");
-        $this->uploadFileToS3("models/$directoryName/$fileName");
+//        dd([
+//            'AWS_ACCESS_KEY_ID' => env('AWS_ACCESS_KEY_ID'),
+//            'AWS_SECRET_ACCESS_KEY' => env('AWS_SECRET_ACCESS_KEY'),
+//            'AWS_DEFAULT_REGION' => env('AWS_DEFAULT_REGION'),
+//            'AWS_BUCKET' => env('AWS_BUCKET'),
+//            'AWS_URL' => env('AWS_URL'),
+//        ]);
+
+        if ($this->confirm('Do you wish to start the upload? [yes|no]')) {
+            $this->uploadFileToS3("models/$directoryName/$fileName");
+        } else {
+            $this->info('Upload cancelled.');
+        }
+
     }
 
-    protected function uploadFileToS3(string $filePath)
+    function uploadFileToS3($filePath)
     {
         try {
-            $content = Storage::disk('local')->get($filePath);
-            $s3Config = config('aws.s3');
-            $s3Disk = Storage::disk('s3')->getDriver()->getAdapter();
+            // Построение полного пути к файлу
+            $fullPath = storage_path('app/' . $filePath);
 
-            // Установка конфигурации S3
-            $s3Disk->setKey($s3Config['key']);
-            $s3Disk->setSecret($s3Config['secret']);
-            $s3Disk->setRegion($s3Config['region']);
-            $s3Disk->setBucket($s3Config['bucket']);
+            // Проверка существования файла
+            if (!file_exists($fullPath)) {
+                throw new Exception("File does not exist: {$fullPath}");
+            }
+
+            // Извлечение имени файла из пути
+            $fileName = basename($fullPath);
+
+            // Чтение содержимого файла
+            $fileContent = file_get_contents($fullPath);
 
             // Загрузка файла на S3
-            Storage::disk('s3')->put($filePath, $content);
+            Storage::disk('s3')->put($fileName, $fileContent, 'public');
 
-
-
-            $this->output->write('Uploading...');
-            for ($i = 0; $i < 5; $i++) {
-                sleep(1);  // Эмуляция процесса загрузки
-                $this->output->write('.');
-            }
-            $this->info(' Upload complete.');
-
-        } catch (\Exception $e) {
-            // Обработка исключений, например, запись в лог
-            Log::error("Failed to upload file to S3: {$e->getMessage()}");
+            echo "File {$fileName} uploaded successfully to S3.";
+        } catch (Exception $e) {
+            echo "An error occurred: " . $e->getMessage();
         }
     }
+
+
 }
