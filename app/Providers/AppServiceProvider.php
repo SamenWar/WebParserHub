@@ -2,18 +2,16 @@
 
 namespace App\Providers;
 
-use Illuminate\Support\ServiceProvider;
+namespace App\Providers;
 
-class AppServiceProvider extends ServiceProvider
-{
-    /**
-     * Register any application services.
-     *
-     * @return void
-     */
-    public function register()
-    {
-        //
+use Illuminate\Support\ServiceProvider;
+use App\Services\DataSenderService;
+
+class AppServiceProvider extends ServiceProvider {
+    public function register() {
+        $this->app->bind('DataSender', function ($app) {
+            return new DataSenderService();
+        });
     }
 
     /**

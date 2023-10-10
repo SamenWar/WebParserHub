@@ -2,6 +2,8 @@
 
 namespace App\Console\Commands;
 require_once 'vendor/autoload.php';
+
+use App\Services\PhotoDownloader;
 use Illuminate\Console\Command;
 use GuzzleHttp\Client;
 use phpQuery;
@@ -23,13 +25,28 @@ class ScrapeModelsServices extends Command
         $this->apiToken = config('fapopedia_net.api.token');
     }
 
-    public function handle()
+    public function handle(PhotoDownloader $photoDownloader)
     {
         $url = 'https://fapopedia.net/list/';
-        $this->logParsingState('started');  // Логирование начала парсинга
-        $data = $this->getModelsAndServices($url);
-        $this->logParsingState('completed');  // Логирование завершения парсинга
-        print_r($data);
+        $dateStart = now()->toDateTimeString();
+        $dat = $this->getModelsAndServices($url);
+        $dateEnd = now()->toDateTimeString();
+        print_r($dat);
+        $this->info('Downloading photos...');
+        // Использование сервиса в роуте, контроллере, job, и т.д.
+
+        $dataSender = app('DataSender');
+        $dataSender->processDataAndSend();
+
+
+        $jsonData = file_get_contents(storage_path('data.json'));
+        $data = json_decode($jsonData, true);
+
+        $photoDownloader->downloadAllPhotos($data);
+
+        $this->info('Photos downloaded successfully.');
+        $this->logParsingState('completed',$dateStart, $dateEnd);  // Логирование завершения парсинга
+
     }
 
 
@@ -114,10 +131,26 @@ class ScrapeModelsServices extends Command
 
                                 $a = 1;
                                 foreach ($nextHtml['.shrt-blk img'] as $photo) {
-                                    $photos[] = pq($photo)->attr('src');
+
+                                    // Извлекаем ссылку из текущего блока и получаем HTML следующей страницы
+                                    $link = pq($photo)->parents('.shrt-blk')->find('a')->attr('href');
+
+                                    $nextPageHtml = file_get_contents($link);
+
+                                    // Ищем следующую ссылку на новой странице и получаем её HTML
+                                    $nextDocument = phpQuery::newDocument($nextPageHtml);
+                                    $nextLink = $nextDocument->find('YOUR_SELECTOR_FOR_NEXT_LINK')->attr('href');
+                                    $finalPageHtml = file_get_contents($nextLink);
+
+                                    // Ищем изображение на последней странице и сохраняем его src
+                                    $finalDocument = phpQuery::newDocument($finalPageHtml);
+                                    $finalImageSrc = $finalDocument->find('img')->attr('src');
+                                    $photos[] = $finalImageSrc;
+
                                     echo "$a\n";
                                     $a++;
                                 }
+
 
                                 $pageCounter++;  // Увеличиваем счетчик страниц после обработки текущей страницы
 
@@ -134,7 +167,15 @@ class ScrapeModelsServices extends Command
                     }
 
 
-                    $data[$modelName] = [
+                    $uniqueId = uniqid();
+
+                    // Ensure the ID is unique by checking it against existing IDs
+                    while (array_key_exists($uniqueId, $data)) {
+                        $uniqueId = uniqid();
+                    }
+
+                    $data[$uniqueId] = [
+                        "name" => $modelName,
                         'profileUrl' => $profileUrl,
                         'social' => $socialLinks,
                         'photos' => $photos
@@ -150,23 +191,21 @@ class ScrapeModelsServices extends Command
 
         return $data;
     }
-
-    private function logParsingState($state)
+    private function logParsingState($state, $dateStart, $dateEnd)
     {
         $client = new Client();
         $uri = $this->apiUrl . '/api/parser/v1/put-log';  // Обновленный URL
 
-        $dateStart = now()->toDateTimeString();  // Пример времени начала
-        $dateEnd = now()->addHour()->toDateTimeString();  // Пример времени окончания, добавив 1 час
+          // Пример времени начала
 
         try {
             $response = $client->post($uri, [
                 'headers' => [
-                    'Parser-Api-Token' => $this->apiToken,  // Обновленный заголовок
+                    'Parser-Api-Token' => $this->apiToken, // Использование токена API
                 ],
                 'json' => [
-                    'errors' => $state == 'completed' ? 'No errors' : '',  // Пример поля ошибок
-                    'site_name' => 'YourSiteName',  // Пример имени сайта
+                    'errors' => $state == 'completed' ? 'No errors' : '',
+                    'site_name' => 'https://fapopedia.net',
                     'date_start' => $dateStart,
                     'date_end' => $dateEnd,
                 ],
@@ -176,10 +215,16 @@ class ScrapeModelsServices extends Command
             if ($response->getStatusCode() != 201) {  // Обновленный код статуса
                 throw new \Exception('Failed to log parsing state: ' . $response->getBody());
             }
+            // Обработка ответа от сервера
+            $serverResponse = json_decode($response->getBody(), true);
+            echo "Server Response: ";
+            print_r($serverResponse);
+
         } catch (\Exception $e) {
             // Обработка ошибок
             echo 'Error: ' . $e->getMessage() . PHP_EOL;
         }
     }
+
 
 }

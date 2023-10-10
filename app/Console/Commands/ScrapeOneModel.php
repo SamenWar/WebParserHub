@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Console\Command;
 use phpQuery;
 
@@ -14,11 +15,14 @@ class ScrapeOneModel extends Command
 {
     protected $signature = 'scrape:three-models';
     protected $description = 'Scrape information of the first three models from the website';
-
+    protected $apiUrl;
+    protected $apiToken;
     public function __construct()
     {
 
         parent::__construct();
+        $this->apiUrl = config('fapopedia_net.api.url');
+        $this->apiToken = config('fapopedia_net.api.token');
     }
 
     public function handle()
@@ -58,10 +62,11 @@ class ScrapeOneModel extends Command
             $response = $client->get($url);
             $htmlContent = (string) $response->getBody();
             $html = phpQuery::newDocumentHTML($htmlContent);
-        } catch (\Exception $e) {
-            // Обработка ошибок запроса или парсинга
-            // Возможно, вы захотите залогировать ошибку и продолжить выполнение скрипта
-            return [];
+            echo 'ff';
+
+        } catch (GuzzleException $e) {
+            echo 'error'. $e->getMessage();
+        ;
         }
 
         $letterLinks = [];
@@ -105,7 +110,7 @@ class ScrapeOneModel extends Command
     private function logParsingState($state)
     {
         $client = new Client();
-        $uri = $this->apiUrl . '/api/parser/v1/put-log';  // Обновленный URL
+        $uri = $this->apiUrl . '/api/parser/v1/put-log';
 
         $dateStart = now()->toDateTimeString();  // Пример времени начала
         $dateEnd = now()->addHour()->toDateTimeString();  // Пример времени окончания, добавив 1 час
@@ -113,7 +118,7 @@ class ScrapeOneModel extends Command
         try {
             $response = $client->post($uri, [
                 'headers' => [
-                    'Parser-Api-Token' => $this->apiToken,
+                    'Parser-Api-Token' => $this->apiToken, // Использование токена API
                 ],
                 'json' => [
                     'errors' => $state == 'completed' ? 'No errors' : '',
@@ -127,6 +132,11 @@ class ScrapeOneModel extends Command
             if ($response->getStatusCode() != 201) {  // Обновленный код статуса
                 throw new \Exception('Failed to log parsing state: ' . $response->getBody());
             }
+            // Обработка ответа от сервера
+            $serverResponse = json_decode($response->getBody(), true);
+            echo "Server Response: ";
+            print_r($serverResponse);
+
         } catch (\Exception $e) {
             // Обработка ошибок
             echo 'Error: ' . $e->getMessage() . PHP_EOL;

@@ -60,22 +60,16 @@ class ListAndSelectDirectory extends Command
 
         $this->info("You have selected: $fileName");
         $this->info("Path to the file: models/$directoryName/$fileName");
-//        dd([
-//            'AWS_ACCESS_KEY_ID' => env('AWS_ACCESS_KEY_ID'),
-//            'AWS_SECRET_ACCESS_KEY' => env('AWS_SECRET_ACCESS_KEY'),
-//            'AWS_DEFAULT_REGION' => env('AWS_DEFAULT_REGION'),
-//            'AWS_BUCKET' => env('AWS_BUCKET'),
-//            'AWS_URL' => env('AWS_URL'),
-//        ]);
 
         if ($this->confirm('Do you wish to start the upload? [yes|no]')) {
-            $uploadResult = $this->s3Uploader->uploadFileToS3("models/$directoryName/$fileName");
+            $uploadResult = $this->s3Uploader->uploadFileToS3("models/$directoryName/$fileName", $fileName);
 
-            if ($uploadResult['success']) {
-                $this->info($uploadResult['message']);
-                $this->info("File URL: " . $uploadResult['fileUrl']);
-            } else {
-                $this->error($uploadResult['message']);
+            $this->info("Server response: " . (is_array($uploadResult) ? json_encode($uploadResult) : $uploadResult));
+
+            if (isset($uploadResult['response'])) {
+                $fileId = $uploadResult['response']; // Извлекаем ID файла из ответа сервера
+
+                $this->updateJsonFile("models/$directoryName/$fileName", $fileId);
             }
         } else {
             $this->info('Upload cancelled.');
@@ -83,31 +77,23 @@ class ListAndSelectDirectory extends Command
 
     }
 
-    function uploadFileToS3($filePath)
-    {
-        try {
-            // Построение полного пути к файлу
-            $fullPath = storage_path('app/' . $filePath);
-
-            // Проверка существования файла
-            if (!file_exists($fullPath)) {
-                throw new Exception("File does not exist: {$fullPath}");
-            }
-
-            // Извлечение имени файла из пути
-            $fileName = basename($fullPath);
-
-            // Чтение содержимого файла
-            $fileContent = file_get_contents($fullPath);
-
-            // Загрузка файла на S3
-            Storage::disk('s3')->put($fileName, $fileContent, 'public');
-
-            echo "File {$fileName} uploaded successfully to S3.";
-        } catch (Exception $e) {
-            echo "An error occurred: " . $e->getMessage();
+    function updateJsonFile($filePath, $fileId, $jsonFilePath = 'file_ids.json') {
+        if (file_exists($jsonFilePath)) {
+            $jsonData = json_decode(file_get_contents($jsonFilePath), true);
+        } else {
+            $jsonData = [];
         }
+
+        $jsonData[] = [
+            'local_path' => $filePath,
+            'remote_id'  => $fileId
+        ];
+
+        // Кодируем массив обратно в JSON и сохраняем его в файле
+        file_put_contents($jsonFilePath, json_encode($jsonData, JSON_PRETTY_PRINT));
     }
+
+
 
 
 }

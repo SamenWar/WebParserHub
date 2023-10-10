@@ -15,7 +15,8 @@
         "laravel/sanctum": "^2.11",
         "laravel/tinker": "^2.5",
         "league/flysystem-aws-s3-v3": "^1.0",
-        "simplehtmldom/simplehtmldom": "^2.0@RC"
+        "simplehtmldom/simplehtmldom": "^2.0@RC",
+      "ext-curl": "*"
     },
     "require-dev": {
         "facade/ignition": "^2.5",
