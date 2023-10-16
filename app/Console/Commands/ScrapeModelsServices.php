@@ -35,14 +35,9 @@ class ScrapeModelsServices extends Command
         $this->info('Downloading photos...');
         // Использование сервиса в роуте, контроллере, job, и т.д.
 
-        $dataSender = app('DataSender');
-        $dataSender->processDataAndSend();
 
 
         $jsonData = file_get_contents(storage_path('data.json'));
-        $data = json_decode($jsonData, true);
-
-        $photoDownloader->downloadAllPhotos($data);
 
         $this->info('Photos downloaded successfully.');
         $this->logParsingState('completed',$dateStart, $dateEnd);  // Логирование завершения парсинга
@@ -109,64 +104,33 @@ class ScrapeModelsServices extends Command
                     }
 
                     $photos = [];
-                    foreach ($profileHtml['.shrt-blk img'] as $photo) {
-                        $photos[] = pq($photo)->attr('src');
-                    }
+                    foreach ($profileHtml['.shrt-blk a'] as $photo) {
+                        $photoUrl = pq($photo)->attr('href');
 
+                        // Получение HTML содержимого по ссылке
+                        $photoHtmlContent = file_get_contents($photoUrl);
 
-
-                    $pageCounter = 1;  // Инициализация счетчика страниц
-
-                    while ($nextLink = $profileHtml['.nv-blk a:last']) {
-                        $href = pq($nextLink)->attr('href');  // Получаем значение атрибута href
-
-                        // Проверяем, содержит ли ссылка действительный URL и текст "Next"
-                        if ($href && filter_var($href, FILTER_VALIDATE_URL) && strpos(pq($nextLink)->text(), 'Next') !== false) {
-                            try {
-                                $response = $client->get($href);
-                                $nextHtmlContent = (string) $response->getBody();
-                                $nextHtml = phpQuery::newDocumentHTML($nextHtmlContent);
-
-                                echo "Processing page: $pageCounter\n";  // Вывод номера текущей страницы
-
-                                $a = 1;
-                                foreach ($nextHtml['.shrt-blk img'] as $photo) {
-
-                                    // Извлекаем ссылку из текущего блока и получаем HTML следующей страницы
-                                    $link = pq($photo)->parents('.shrt-blk')->find('a')->attr('href');
-
-                                    $nextPageHtml = file_get_contents($link);
-
-                                    // Ищем следующую ссылку на новой странице и получаем её HTML
-                                    $nextDocument = phpQuery::newDocument($nextPageHtml);
-                                    $nextLink = $nextDocument->find('YOUR_SELECTOR_FOR_NEXT_LINK')->attr('href');
-                                    $finalPageHtml = file_get_contents($nextLink);
-
-                                    // Ищем изображение на последней странице и сохраняем его src
-                                    $finalDocument = phpQuery::newDocument($finalPageHtml);
-                                    $finalImageSrc = $finalDocument->find('img')->attr('src');
-                                    $photos[] = $finalImageSrc;
-
-                                    echo "$a\n";
-                                    $a++;
-                                }
-
-
-                                $pageCounter++;  // Увеличиваем счетчик страниц после обработки текущей страницы
-
-                                // Обновляем $profileHtml для следующей итерации
-                                $profileHtml = $nextHtml;
-                            } catch (\Exception $e) {
-                                // Логирование ошибок при отправке запроса или обработке ответа
-                                echo "Error processing page $pageCounter: {$e->getMessage()}\n";
-                                break;  // Выход из цикла при возникновении ошибки
-                            }
-                        } else {
-                            break;  // Выход из цикла, если условия не выполняются
+                        if ($photoHtmlContent === false) {
+                            echo "Ошибка при получении содержимого по URL: $photoUrl";
+                            continue;
                         }
+
+                        // Парсинг HTML содержимого
+                        $photoDoc = phpQuery::newDocument($photoHtmlContent);
+
+                        // Ищем ссылку внутри контейнера с классом 'lrg-pc-blk'
+                        $innerLink = $photoDoc['.lrg-pc a']->attr('href');
+
+                        if ($innerLink) {
+                            $photos[] = $innerLink;
+                        }
+
+
+
                     }
-
-
+                    if ($i >= 60) {
+                        break;
+                    }
                     $uniqueId = uniqid();
 
                     // Ensure the ID is unique by checking it against existing IDs
@@ -184,6 +148,7 @@ class ScrapeModelsServices extends Command
                     echo "one model $modelName ready $i\n";
                     $i++;
                 }
+
             }
         }
 

@@ -32,7 +32,7 @@ class S3FileUploaderService
 
         try {
             // Выполняем запрос и получаем ответ от сервера
-            $response = $client->post($this->apiUrl.'/api/parser/v1/put-object', [
+            $response = $client->post($this->apiUrl.'/storage/s3/image/store', [
                 'headers' => [
                     'Authorization' => 'Bearer ' . $this->token
                 ],

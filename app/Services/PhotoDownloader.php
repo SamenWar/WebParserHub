@@ -51,7 +51,8 @@ class PhotoDownloader
         $totalModels = count($data);  // Получаем общее количество моделей
         $processedModels = 0;  // Инициализируем счетчик обработанных моделей
 
-        foreach ($data as $modelName => $profile) {
+        foreach ($data as $profile) {
+            $modelName =$profile['name'];
             $photos = $profile['photos'] ?? [];
             $this->downloadPhotos($modelName, $photos);
 

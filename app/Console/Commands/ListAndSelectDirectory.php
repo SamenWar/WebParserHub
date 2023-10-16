@@ -40,6 +40,7 @@ class ListAndSelectDirectory extends Command
 
         $directoryName = $helper->ask($this->input, $this->output, $directoryQuestion);
 
+     
         $this->info("You have selected: $directoryName");
 
         $files = Storage::disk('local')->files("models/$directoryName");
@@ -48,31 +49,46 @@ class ListAndSelectDirectory extends Command
             return;
         }
 
-        $fileNames = array_map('basename', $files);
-        $fileQuestion = new ChoiceQuestion(
-            'Please select a file (use arrow keys to navigate):',
-            $fileNames,
-            0
-        );
-        $fileQuestion->setErrorMessage('File %s is invalid.');
+// Задаем вопрос о загрузке всех файлов
+        if ($this->confirm('Do you wish to upload all files in the directory? [yes|no]')) {
+            foreach ($files as $file) {
+                $fileName = basename($file);
+                $this->info("Uploading: $fileName");
 
-        $fileName = $helper->ask($this->input, $this->output, $fileQuestion);
+                $uploadResult = $this->s3Uploader->uploadFileToS3($file, $fileName);
+                $this->info("Server response: " . (is_array($uploadResult) ? json_encode($uploadResult) : $uploadResult));
 
-        $this->info("You have selected: $fileName");
-        $this->info("Path to the file: models/$directoryName/$fileName");
-
-        if ($this->confirm('Do you wish to start the upload? [yes|no]')) {
-            $uploadResult = $this->s3Uploader->uploadFileToS3("models/$directoryName/$fileName", $fileName);
-
-            $this->info("Server response: " . (is_array($uploadResult) ? json_encode($uploadResult) : $uploadResult));
-
-            if (isset($uploadResult['response'])) {
-                $fileId = $uploadResult['response']; // Извлекаем ID файла из ответа сервера
-
-                $this->updateJsonFile("models/$directoryName/$fileName", $fileId);
+                if (isset($uploadResult['response'])) {
+                    $fileId = $uploadResult['response'];
+                    $this->updateJsonFile($file, $fileId);
+                }
             }
         } else {
-            $this->info('Upload cancelled.');
+            $fileNames = array_map('basename', $files);
+            $fileQuestion = new ChoiceQuestion(
+                'Please select a file (use arrow keys to navigate):',
+                $fileNames,
+                0
+            );
+            $fileQuestion->setErrorMessage('File %s is invalid.');
+
+            $fileName = $helper->ask($this->input, $this->output, $fileQuestion);
+
+            $this->info("You have selected: $fileName");
+            $this->info("Path to the file: models/$directoryName/$fileName");
+
+            if ($this->confirm('Do you wish to start the upload? [yes|no]')) {
+                $uploadResult = $this->s3Uploader->uploadFileToS3("models/$directoryName/$fileName", $fileName);
+
+                $this->info("Server response: " . (is_array($uploadResult) ? json_encode($uploadResult) : $uploadResult));
+
+                if (isset($uploadResult['response'])) {
+                    $fileId = $uploadResult['response'];
+                    $this->updateJsonFile("models/$directoryName/$fileName", $fileId);
+                }
+            } else {
+                $this->info('Upload cancelled.');
+            }
         }
 
     }
